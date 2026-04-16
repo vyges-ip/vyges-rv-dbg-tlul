@@ -2,6 +2,8 @@
 // Copyright 2026 Vyges
 //
 // vyges_rv_dbg_tlul_slave — TL-UL slave ↔ plain req/gnt slave adapter.
+// Serializes A-channel transactions onto pulp dm_top.slave_* (single-cycle
+// latency) and returns rdata on the D-channel.
 
 module vyges_rv_dbg_tlul_slave
   import tlul_pkg::*;
@@ -22,12 +24,96 @@ module vyges_rv_dbg_tlul_slave
     input  logic [BusWidth-1:0]   slave_rdata_i
 );
 
-    // TODO: adapter implementation
-    assign tl_d_o        = '0;
-    assign slave_req_o   = 1'b0;
-    assign slave_we_o    = 1'b0;
-    assign slave_addr_o  = '0;
-    assign slave_be_o    = '0;
-    assign slave_wdata_o = '0;
+    // verilog_lint: waive-start line-length
+    // Only BusWidth == TL_DW supported in this adapter. Assert at elab.
+    `ifndef SYNTHESIS
+    initial begin
+        if (BusWidth != top_pkg::TL_DW) begin
+            $error("vyges_rv_dbg_tlul_slave: BusWidth (%0d) must match TL_DW (%0d)",
+                   BusWidth, top_pkg::TL_DW);
+        end
+    end
+    `endif
+
+    typedef enum logic [1:0] {
+        S_IDLE    = 2'b00,
+        S_PENDING = 2'b01,
+        S_RESPOND = 2'b10
+    } state_e;
+
+    state_e state_q, state_d;
+
+    // Latched A-channel fields
+    logic                         we_q;
+    logic [BusWidth-1:0]          addr_q;
+    logic [BusWidth/8-1:0]        be_q;
+    logic [BusWidth-1:0]          wdata_q;
+    logic [top_pkg::TL_AIW-1:0]   source_q;
+    logic [top_pkg::TL_SZW-1:0]   size_q;
+
+    // Captured read data from pulp (registered at end of PENDING)
+    logic [BusWidth-1:0]          rdata_q;
+
+    // ── FSM transitions ──────────────────────────────────────────────
+    always_comb begin
+        state_d = state_q;
+        unique case (state_q)
+            S_IDLE:    if (tl_d_i.a_valid)     state_d = S_PENDING;
+            S_PENDING:                          state_d = S_RESPOND;
+            S_RESPOND: if (tl_d_i.d_ready)     state_d = S_IDLE;
+            default:                            state_d = S_IDLE;
+        endcase
+    end
+
+    always_ff @(posedge clk_i or negedge rst_ni) begin
+        if (!rst_ni) begin
+            state_q  <= S_IDLE;
+            we_q     <= 1'b0;
+            addr_q   <= '0;
+            be_q     <= '0;
+            wdata_q  <= '0;
+            source_q <= '0;
+            size_q   <= '0;
+            rdata_q  <= '0;
+        end else begin
+            state_q <= state_d;
+
+            // Latch A-channel on IDLE → PENDING
+            if (state_q == S_IDLE && tl_d_i.a_valid) begin
+                we_q     <= (tl_d_i.a_opcode == PutFullData) ||
+                            (tl_d_i.a_opcode == PutPartialData);
+                addr_q   <= tl_d_i.a_address[BusWidth-1:0];
+                be_q     <= tl_d_i.a_mask;
+                wdata_q  <= tl_d_i.a_data[BusWidth-1:0];
+                source_q <= tl_d_i.a_source;
+                size_q   <= tl_d_i.a_size;
+            end
+
+            // Capture pulp rdata at end of PENDING (rdata valid same cycle
+            // as slave_req_o per pulp dm_mem convention).
+            if (state_q == S_PENDING) begin
+                rdata_q <= slave_rdata_i;
+            end
+        end
+    end
+
+    // ── Pulp slave-port outputs ──────────────────────────────────────
+    assign slave_req_o   = (state_q == S_PENDING);
+    assign slave_we_o    = we_q;
+    assign slave_addr_o  = addr_q;
+    assign slave_be_o    = be_q;
+    assign slave_wdata_o = wdata_q;
+
+    // ── TL-UL D-channel response ─────────────────────────────────────
+    always_comb begin
+        tl_d_o          = TL_D2H_DEFAULT;
+        tl_d_o.a_ready  = (state_q == S_IDLE);
+        tl_d_o.d_valid  = (state_q == S_RESPOND);
+        tl_d_o.d_opcode = we_q ? AccessAck : AccessAckData;
+        tl_d_o.d_size   = size_q;
+        tl_d_o.d_source = source_q;
+        tl_d_o.d_data   = {{(top_pkg::TL_DW-BusWidth){1'b0}}, rdata_q};
+        tl_d_o.d_error  = 1'b0;
+    end
 
 endmodule

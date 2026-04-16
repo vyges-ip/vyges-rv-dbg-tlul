@@ -2,12 +2,15 @@
 // Copyright 2026 Vyges
 //
 // vyges_rv_dbg_tlul_master — plain req/gnt master ↔ TL-UL master adapter.
+// Converts pulp dm_sba master_* signals into outgoing TL-UL A-channel
+// transactions; returns D-channel response back via master_r_* signals.
+// Single-outstanding.
 
 module vyges_rv_dbg_tlul_master
   import tlul_pkg::*;
 #(
-    parameter int unsigned BusWidth      = 32,
-    parameter logic [TL_AIW-1:0] SourceId = 'h0
+    parameter int unsigned       BusWidth = 32,
+    parameter logic [top_pkg::TL_AIW-1:0] SourceId = 'h0
 ) (
     input  logic                  clk_i,
     input  logic                  rst_ni,
@@ -27,12 +30,84 @@ module vyges_rv_dbg_tlul_master
     input  tl_d2h_t               tl_h_i
 );
 
-    // TODO: adapter implementation
-    assign tl_h_o               = '0;
-    assign master_gnt_o         = 1'b0;
-    assign master_r_valid_o     = 1'b0;
-    assign master_r_err_o       = 1'b0;
-    assign master_r_other_err_o = 1'b0;
-    assign master_r_rdata_o     = '0;
+    `ifndef SYNTHESIS
+    initial begin
+        if (BusWidth != top_pkg::TL_DW) begin
+            $error("vyges_rv_dbg_tlul_master: BusWidth (%0d) must match TL_DW (%0d)",
+                   BusWidth, top_pkg::TL_DW);
+        end
+    end
+    `endif
+
+    typedef enum logic [1:0] {
+        M_IDLE   = 2'b00,
+        M_AISSUE = 2'b01,
+        M_DWAIT  = 2'b10
+    } state_e;
+
+    state_e state_q, state_d;
+
+    // Latched master-side request
+    logic                         we_q;
+    logic [BusWidth-1:0]          addr_q;
+    logic [BusWidth/8-1:0]        be_q;
+    logic [BusWidth-1:0]          wdata_q;
+
+    // ── FSM transitions ──────────────────────────────────────────────
+    always_comb begin
+        state_d = state_q;
+        unique case (state_q)
+            M_IDLE:   if (master_req_i)   state_d = M_AISSUE;
+            M_AISSUE: if (tl_h_i.a_ready) state_d = M_DWAIT;
+            M_DWAIT:  if (tl_h_i.d_valid) state_d = M_IDLE;
+            default:                      state_d = M_IDLE;
+        endcase
+    end
+
+    always_ff @(posedge clk_i or negedge rst_ni) begin
+        if (!rst_ni) begin
+            state_q <= M_IDLE;
+            we_q    <= 1'b0;
+            addr_q  <= '0;
+            be_q    <= '0;
+            wdata_q <= '0;
+        end else begin
+            state_q <= state_d;
+
+            // Latch master request on IDLE → AISSUE
+            if (state_q == M_IDLE && master_req_i) begin
+                we_q    <= master_we_i;
+                addr_q  <= master_add_i;
+                be_q    <= master_be_i;
+                wdata_q <= master_wdata_i;
+            end
+        end
+    end
+
+    // ── Grant handshake to pulp master ───────────────────────────────
+    // gnt pulses for one cycle when we accept the request into the FSM.
+    // Matches the "accept on gnt" convention used by pulp dm_sba.
+    assign master_gnt_o = (state_q == M_IDLE) && master_req_i;
+
+    // ── TL-UL A-channel output ───────────────────────────────────────
+    always_comb begin
+        tl_h_o           = TL_H2D_DEFAULT;
+        tl_h_o.a_valid   = (state_q == M_AISSUE);
+        tl_h_o.a_opcode  = we_q ? ((&be_q) ? PutFullData : PutPartialData)
+                                : Get;
+        tl_h_o.a_size    = top_pkg::TL_SZW'($clog2(BusWidth/8));
+        tl_h_o.a_source  = SourceId;
+        tl_h_o.a_address = {{(top_pkg::TL_AW-BusWidth){1'b0}}, addr_q};
+        tl_h_o.a_mask    = be_q;
+        tl_h_o.a_data    = {{(top_pkg::TL_DW-BusWidth){1'b0}}, wdata_q};
+        tl_h_o.a_user    = TL_A_USER_DEFAULT;
+        tl_h_o.d_ready   = (state_q == M_DWAIT);
+    end
+
+    // ── Response back to pulp master ─────────────────────────────────
+    assign master_r_valid_o     = (state_q == M_DWAIT) && tl_h_i.d_valid;
+    assign master_r_rdata_o     = tl_h_i.d_data[BusWidth-1:0];
+    assign master_r_err_o       = tl_h_i.d_error;
+    assign master_r_other_err_o = 1'b0;  // reserved — TL-UL surfaces only d_error
 
 endmodule
