@@ -424,13 +424,21 @@
   },
   "debug_spec": {
     "version": "0.13",
-    "dmi_transport": ["jtag_tap", "tl_ul_dmi (optional via UseDmiInterface)"],
-    "supported_abstract_commands": ["Access Register", "Quick Access"],
+    "dmi_transport": [
+      "jtag_tap",
+      "tl_ul_dmi (optional via UseDmiInterface)"
+    ],
+    "supported_abstract_commands": [
+      "Access Register",
+      "Quick Access"
+    ],
     "supports_program_buffer": true,
     "program_buffer_size_words": 16,
     "data_registers_count": 12,
     "supports_sba": true,
-    "sba_widths": [32],
+    "sba_widths": [
+      32
+    ],
     "supports_halt_groups": false,
     "supports_halt_groups_note": "Per-hart halt works for NrHarts > 1, but coordinated halt-groups require SoC-level glue not in this wrapper.",
     "hart_reset_support": true,
@@ -440,8 +448,23 @@
   "schema_integration": {
     "soc_spec_key": "debug_module",
     "soc_spec_ip_value": "vyges-rv-dbg-tlul",
-    "required_schema_fields": ["instance", "target_cpu", "base_address"],
-    "recommended_schema_fields": ["xbar", "jtag.idcode", "jtag.tck_pin", "jtag.tms_pin", "jtag.tdi_pin", "jtag.tdo_pin"],
+    "required_schema_fields": [
+      "instance",
+      "target_cpu",
+      "base_address"
+    ],
+    "recommended_schema_fields": [
+      "xbar",
+      "jtag.idcode",
+      "jtag.tck_pin",
+      "jtag.tms_pin",
+      "jtag.tdi_pin",
+      "jtag.tdo_pin"
+    ],
     "schema_source": "vyges-ip-internal/soc_spec/schema/split/soc-debug-module.json"
+  },
+  "upstream": {
+    "repo": "https://github.com/vyges/vyges-rv-dbg-tlul",
+    "commit": "7c9e27100b1ba76f1c2d5205a18a571840f9ab75"
   }
 }
