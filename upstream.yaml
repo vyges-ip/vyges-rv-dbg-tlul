@@ -3,7 +3,7 @@ upstream:
   type: "standalone"
   repo: https://github.com/vyges/vyges-rv-dbg-tlul
   branch: main
-  commit: 7c9e27100b1ba76f1c2d5205a18a571840f9ab75
+  commit: 5cd2c4d3623c4434cd6fb9fb3c9b4659bd91d33a
 import:
   rtl:
     - path: "rtl"
