@@ -1,0 +1,21 @@
+schema_version: "vyges-upstream-v1"
+upstream:
+  type: "standalone"
+  repo: https://github.com/vyges/vyges-rv-dbg-tlul
+  branch: main
+  commit: 7c9e27100b1ba76f1c2d5205a18a571840f9ab75
+import:
+  rtl:
+    - path: "rtl"
+      map_to: "rtl"
+  license:
+    - path: "LICENSE"
+  readme:
+    - path: "README.md"
+  metadata:
+    - path: "vyges-metadata.json"
+exclude: []
+license:
+  spdx: Apache-2.0
+  file: LICENSE
+metadata_locked: true
