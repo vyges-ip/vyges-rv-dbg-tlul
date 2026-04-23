@@ -113,7 +113,8 @@
       "protocol": "TL-UL",
       "port": "regs_tl_d",
       "width": 32,
-      "description": "TL-UL slave — 8 KB region covering debug CSRs (0x000-0x7FF) and debug ROM + program buffer (0x800-0xFFF)"
+      "description": "TL-UL slave \u2014 8 KB region covering debug CSRs (0x000-0x7FF) and debug ROM + program buffer (0x800-0xFFF)",
+      "protocol_level": "baseline"
     },
     {
       "type": "bus",
@@ -121,7 +122,8 @@
       "protocol": "TL-UL",
       "port": "sba_tl_h",
       "width": 32,
-      "description": "TL-UL host — System Bus Access for debugger-initiated R/W"
+      "description": "TL-UL host \u2014 System Bus Access for debugger-initiated R/W",
+      "protocol_level": "baseline"
     },
     {
       "type": "custom",
@@ -337,7 +339,7 @@
       "offset": "0x0000",
       "size": "0x800",
       "size_bytes": 2048,
-      "description": "Debug Module CSR region — dmcontrol, dmstatus, hartinfo, abstract command, data[0..11], progbuf[0..15], sbcs/sbaddress/sbdata (SBA CSRs). Accessed by external debugger via JTAG — NOT intended for firmware access. Firmware must treat this region as reserved.",
+      "description": "Debug Module CSR region \u2014 dmcontrol, dmstatus, hartinfo, abstract command, data[0..11], progbuf[0..15], sbcs/sbaddress/sbdata (SBA CSRs). Accessed by external debugger via JTAG \u2014 NOT intended for firmware access. Firmware must treat this region as reserved.",
       "firmware_visible": false,
       "debug_only": true
     },
@@ -391,7 +393,7 @@
       "jtag_tms (input)",
       "jtag_tdi (input)",
       "jtag_tdo (output, tri-state via tdo_oe)",
-      "jtag_trst_n (input, optional — tie 1'b1 if unused)"
+      "jtag_trst_n (input, optional \u2014 tie 1'b1 if unused)"
     ],
     "reset_domain": "system_reset",
     "reset_note": "Use power-on reset (NOT system reset). Debug module must remain alive across CPU resets so debugger session survives ndmreset.",
@@ -405,16 +407,16 @@
       {
         "start": "base_address + 0x0000",
         "end": "base_address + 0x0FFF",
-        "reason": "Debug module address space — firmware code/data must not be placed here"
+        "reason": "Debug module address space \u2014 firmware code/data must not be placed here"
       }
     ],
     "boot_rom_notes": [
-      "No firmware action required for debug-module initialization — it self-initializes from pulp dm_csrs reset values.",
+      "No firmware action required for debug-module initialization \u2014 it self-initializes from pulp dm_csrs reset values.",
       "If dmactive_o is used for clock gating, boot ROM should wait briefly after reset before assuming peripherals are clocked."
     ],
     "interrupt_integration": {
       "emits_interrupts": false,
-      "note": "Debug module signals entry via debug_req_o (debug mode is not a standard interrupt). Firmware does not handle debug traps — they are handled by the CPU's debug mode controller which executes the park loop in dm_mem."
+      "note": "Debug module signals entry via debug_req_o (debug mode is not a standard interrupt). Firmware does not handle debug traps \u2014 they are handled by the CPU's debug mode controller which executes the park loop in dm_mem."
     },
     "toolchain": {
       "compiler_flag_required": "-march=rv32imc_zicsr (debug CSR access requires Zicsr extension)",
@@ -443,7 +445,7 @@
     "supports_halt_groups_note": "Per-hart halt works for NrHarts > 1, but coordinated halt-groups require SoC-level glue not in this wrapper.",
     "hart_reset_support": true,
     "authentication": "none",
-    "authentication_note": "No authentication — debug is unconditionally enabled. For lifecycle-gated debug use opentitan-rv-dm with full OpenTitan lc_ctrl stack."
+    "authentication_note": "No authentication \u2014 debug is unconditionally enabled. For lifecycle-gated debug use opentitan-rv-dm with full OpenTitan lc_ctrl stack."
   },
   "schema_integration": {
     "soc_spec_key": "debug_module",
